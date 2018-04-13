@@ -1,8 +1,8 @@
 <?php
 
-namespace App;
+namespace Model;
 
-class Model
+class BaseModel
 {
 	protected static $table = null;
 	protected static $primaryKey = 'id';
@@ -12,6 +12,10 @@ class Model
 	{
 	}
 */
+	public static function getDb()
+	{
+		return $GLOBALS['app']->getContainer()['db']->getConnection();		
+	}
 
 	public static function paginate($number)
 	{
@@ -20,34 +24,49 @@ class Model
 
 	public static function all()
 	{
-		Database::connect();
+		$db = static::getDb();
+
 		$raw_sql = 'SELECT '.implode(',', static::$columns).','.static::$primaryKey.' '
 				 . 'FROM '.static::$table;
-		$query = Database::getConnection()->query($raw_sql);
+		$query = $db->query($raw_sql);
 		$result = $query->fetchAll(\PDO::FETCH_OBJ);
 		return $result;
 	}
 
 	public static function find($id)
 	{
-		Database::connect();
+		$db = static::getDb();
+
 		$raw_sql = 'SELECT '.implode(',', static::$columns).','.static::$primaryKey.' '
 				 . 'FROM '.static::$table.' '
 				 . 'WHERE '.static::$primaryKey.' = ?';
 
-		$query = Database::getConnection()->prepare($raw_sql);
+		$query = $db->prepare($raw_sql);
 		$query->execute([$id]);
 		$result = $query->fetch(\PDO::FETCH_OBJ);
 		return $result;
 	}
 
+	public static function findOrFail($id)
+	{
+		$result = static::find($id);
+		if ($result) {
+			return $result;
+		} else {
+			$request = $GLOBALS['app']->getContainer()['request'];
+			$response = $GLOBALS['app']->getContainer()['response'];
+			throw new \Slim\Exception\NotFoundException($request, $response);
+		}
+	}
+
 	public static function where($sql, $params)
 	{
-		Database::connect();
+		$db = static::getDb();
+
 		$raw_sql = 'SELECT '.implode(',', static::$columns).','.static::$primaryKey.' '
 				 . 'FROM '.static::$table.' '
 				 . 'WHERE '.$sql;
-		$query = Database::getConnection()->prepare($raw_sql);
+		$query = $db->prepare($raw_sql);
 		$query->execute($params);
 		$result = $query->fetchAll(\PDO::FETCH_OBJ);
 		return $result;
@@ -55,8 +74,7 @@ class Model
 
 	public static function insert($obj)
 	{
-		Database::connect();
-		$db = Database::getConnection();
+		$db = static::getDb();
 
 		$mark = [];
 		for ($i = 0; $i < count(static::$columns); $i ++) {
@@ -82,7 +100,7 @@ class Model
 
 	public static function update($obj)
 	{
-		Database::connect();
+		$db = static::getDb();
 
 		$set_col = static::$columns;
 		foreach ($set_col as &$col) {
@@ -99,18 +117,18 @@ class Model
 		}
 		$params[] = $obj->{static::$primaryKey};
 
-		$query = Database::getConnection()->prepare($raw_sql);
+		$query = $db->prepare($raw_sql);
 		$query->execute($params);
 	}
 
 	public static function destroy($id)
 	{
-		Database::connect();
+		$db = static::getDb();
 
 		$raw_sql = 'DELETE FROM '.static::$table.' '
                  . 'WHERE '.static::$primaryKey.' = ?';
 
-		$query = Database::getConnection()->prepare($raw_sql);
+		$query = $db->prepare($raw_sql);
 		$query->execute([$id]);
 	}
 }
